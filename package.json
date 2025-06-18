@@ -3,7 +3,15 @@
   "displayName": "XSD Treeview",
   "publisher": "sh17ck",
   "description": "This VSCode extension provide a XML-schema tree view for elements.",
+  "license": "MIT",
   "version": "0.0.1",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sh17ck/vscode-xsd-treeview.git"
+  },
+  "bugs": {
+    "url": "https://github.com/sh17ck/vscode-xsd-treeview/issues"
+  },
   "engines": {
     "vscode": "^1.44.0"
   },
