@@ -30,7 +30,16 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
     constructor() {
         this.disposables.push(
             vscode.window.onDidChangeActiveTextEditor(() => this.checkDocument()),
-            vscode.workspace.onDidChangeTextDocument(() => this.checkDocument())
+            vscode.workspace.onDidChangeTextDocument((e) => {
+                const activeEditor = vscode.window.activeTextEditor;
+                if (
+                    activeEditor &&
+                    e.document.uri.toString() === activeEditor.document.uri.toString() &&
+                    activeEditor.document.languageId === 'xml'
+                ) {
+                    this.checkDocument(true);
+                }
+            })
         );
         this.checkDocument();
     }
@@ -93,6 +102,7 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
             if (this.isXsdDocument) {
                 await this.loadImportedSchemas(editor.document.uri);
             }
+            this._onDidChangeTreeData.fire(undefined);
         } catch (error) {
             vscode.window.showErrorMessage('Error parsing document: ' + (error instanceof Error ? error.message : String(error)));
             console.error('Error parsing document:', error);
