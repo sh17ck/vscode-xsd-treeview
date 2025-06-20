@@ -3,7 +3,7 @@ import { XsdOutlineProvider } from './xsdOutline';
 import { XsdDecorationProvider } from './xsdNodeDecorationProvider';
 
 export function activate(context: vscode.ExtensionContext) {
-    const provider = new XsdOutlineProvider(context);
+    const provider = new XsdOutlineProvider();
     
     context.subscriptions.push(
         vscode.window.registerTreeDataProvider('xsdOutline', provider),
