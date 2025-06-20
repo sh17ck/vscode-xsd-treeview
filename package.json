@@ -4,7 +4,7 @@
   "publisher": "sh17ck",
   "description": "This VSCode extension provide a XML-schema tree view for elements.",
   "license": "MIT",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "repository": {
     "type": "git",
     "url": "https://github.com/sh17ck/vscode-xsd-treeview.git"
@@ -35,8 +35,13 @@
     "commands": [
       {
         "command": "xsdOutline.refresh",
-        "title": "Refresh XSD Outline",
-        "when": "xsdOutlineEnabled"
+        "title": "Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "xsdOutline.collapseAll",
+        "title": "Collapse All",
+        "icon": "$(collapse-all)"
       },
       {
         "command": "xsdOutline.openSelection",
@@ -52,6 +57,17 @@
           "description": "Automatically refresh the outline when the document changes"
         }
       }
+    },
+    "viewsContainers": {},
+    "menus": {
+      "view/title": [
+        {
+          "command": "xsdOutline.refresh",
+          "when": "view == xsdOutline",
+          "group": "navigation",
+          "icon": "$(refresh)"
+        }
+      ]
     }
   },
   "scripts": {

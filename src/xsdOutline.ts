@@ -15,7 +15,7 @@ interface XsdNode {
     xpath?: string;
 }
 
-export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode> {
+export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vscode.Disposable {
     private _onDidChangeTreeData = new vscode.EventEmitter<XsdNode | undefined>();
     readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
@@ -23,11 +23,32 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode> {
     private editor: vscode.TextEditor | undefined;
     private isXsdDocument = false;
     private importedDocuments = new Map<string, {doc: Document, uri: vscode.Uri}>();
+    private importedSchemaCache = new Map<string, {doc: Document, mtimeMs: number}>();
 
-    constructor(private context: vscode.ExtensionContext) {
-        vscode.window.onDidChangeActiveTextEditor(() => this.checkDocument());
-        vscode.workspace.onDidChangeTextDocument(() => this.checkDocument());
+    private disposables: vscode.Disposable[] = [];
+
+    constructor() {
+        this.disposables.push(
+            vscode.window.onDidChangeActiveTextEditor(() => this.checkDocument()),
+            vscode.workspace.onDidChangeTextDocument((e) => {
+                const activeEditor = vscode.window.activeTextEditor;
+                if (
+                    activeEditor &&
+                    e.document.uri.toString() === activeEditor.document.uri.toString() &&
+                    activeEditor.document.languageId === 'xml'
+                ) {
+                    this.checkDocument(true);
+                }
+            })
+        );
         this.checkDocument();
+    }
+
+    dispose() {
+        for (const d of this.disposables) {
+            d.dispose();
+        }
+        this.disposables = [];
     }
 
     refresh(): void {
@@ -81,7 +102,9 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode> {
             if (this.isXsdDocument) {
                 await this.loadImportedSchemas(editor.document.uri);
             }
+            this._onDidChangeTreeData.fire(undefined);
         } catch (error) {
+            vscode.window.showErrorMessage('Error parsing document: ' + (error instanceof Error ? error.message : String(error)));
             console.error('Error parsing document:', error);
         }
     }
@@ -92,22 +115,29 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode> {
         const importElements = this.selectElements("/*[local-name()='schema']/*[local-name()='import' or local-name()='include']");
         
         for (const importEl of importElements) {
-            const schemaLocation = importEl.getAttribute('schemaLocation');
-            if (!schemaLocation) continue;
+            await this.handleImportElement(importEl, baseUri);
+        }
+    }
 
-            try {
-                const importedUri = await this.resolveSchemaLocation(baseUri, schemaLocation);
-                if (!importedUri) continue;
-
-                const importedDoc = await this.loadSchemaDocument(importedUri);
-                if (importedDoc) {
-                    const namespace = importEl.getAttribute('namespace') || '';
-                    this.importedDocuments.set(namespace, {doc: importedDoc, uri: importedUri});
-                    this.collectElementPositionsFromImported(importedUri, importedDoc);
-                }
-            } catch (error) {
-                console.error(`Error loading imported schema ${schemaLocation}:`, error);
+    private async handleImportElement(importEl: Element, baseUri: vscode.Uri): Promise<void> {
+        const schemaLocation = importEl.getAttribute('schemaLocation');
+        if (!schemaLocation) return;
+        try {
+            const importedUri = await this.resolveSchemaLocation(baseUri, schemaLocation);
+            if (!importedUri) {
+                vscode.window.showErrorMessage(`Can't find imported schema: ${schemaLocation}`);
+                return;
             }
+            const importedDoc = await this.loadSchemaDocumentWithCache(importedUri);
+            if (importedDoc) {
+                const namespace = importEl.getAttribute('namespace') || '';
+                this.importedDocuments.set(namespace, {doc: importedDoc, uri: importedUri});
+            } else {
+                vscode.window.showErrorMessage(`Can't load imported schema: ${schemaLocation}`);
+            }
+        } catch (error) {
+            vscode.window.showErrorMessage('Error loading imported schema: ' + (error instanceof Error ? error.message : String(error)));
+            console.error(`Error loading imported schema ${schemaLocation}:`, error);
         }
     }
 
@@ -116,15 +146,19 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode> {
             if (!path.isAbsolute(location)) {
                 const basePath = path.dirname(baseUri.fsPath);
                 const fullPath = path.join(basePath, location);
-                if (fs.existsSync(fullPath)) {
+                try {
+                    await fs.promises.access(fullPath);
                     return vscode.Uri.file(fullPath);
-                }
+                } catch {}
             }
 
             try {
                 const uri = vscode.Uri.parse(location);
-                if (uri.scheme === 'file' && fs.existsSync(uri.fsPath)) {
-                    return uri;
+                if (uri.scheme === 'file') {
+                    try {
+                        await fs.promises.access(uri.fsPath);
+                        return uri;
+                    } catch {}
                 }
             } catch {}
 
@@ -140,70 +174,29 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode> {
         }
     }
 
-    private async loadSchemaDocument(uri: vscode.Uri): Promise<Document | undefined> {
+    private async loadSchemaDocumentWithCache(uri: vscode.Uri): Promise<Document | undefined> {
         try {
-            let content: string;
             if (uri.scheme === 'file') {
-                content = fs.readFileSync(uri.fsPath, 'utf-8');
+                const stat = await fs.promises.stat(uri.fsPath);
+                const cached = this.importedSchemaCache.get(uri.fsPath);
+                if (cached && cached.mtimeMs === stat.mtimeMs) {
+                    return cached.doc;
+                }
+                const content = await fs.promises.readFile(uri.fsPath, 'utf-8');
+                const doc = new xmldom.DOMParser({locator: {}}).parseFromString(content);
+                this.importedSchemaCache.set(uri.fsPath, {doc, mtimeMs: stat.mtimeMs});
+                return doc;
             } else {
                 const document = await vscode.workspace.openTextDocument(uri);
-                content = document.getText();
+                const content = document.getText();
+                const doc = new xmldom.DOMParser({locator: {}}).parseFromString(content);
+                return doc;
             }
-            return new xmldom.DOMParser({locator: {}}).parseFromString(content);
         } catch (error) {
+            vscode.window.showErrorMessage('Error loading schema document: ' + (error instanceof Error ? error.message : String(error)));
             console.error('Error loading schema document:', error);
             return undefined;
         }
-    }
-
-    private collectElementPositionsFromImported(uri: vscode.Uri, doc: Document): void {
-        try {
-            const elements = Array.from(doc.getElementsByTagName('*')).filter(el => {
-                const localName = el.localName || el.tagName.toLowerCase();
-                return (localName === 'element' || localName === 'complexType' || localName === 'simpleType') && 
-                    el.hasAttribute('name');
-            });
-
-            for (const element of elements) {
-                const name = element.getAttribute('name');
-                if (name) {
-                    const lineNumber = this.getElementLineNumber(uri, element);
-                }
-            }
-        } catch (error) {
-            console.error('Error collecting positions from imported schema:', error);
-        }
-    }
-
-    private getElementLineNumber(uri: vscode.Uri, element: Element): number {
-        try {
-            const doc = vscode.workspace.textDocuments.find(d => d.uri.toString() === uri.toString());
-            if (doc) {
-                const serializer = new xmldom.XMLSerializer();
-                const xmlText = serializer.serializeToString(element);
-                const fullText = doc.getText();
-                const pos = fullText.indexOf(xmlText);
-                if (pos >= 0) {
-                    return doc.positionAt(pos).line;
-                }
-            }
-
-            if (uri.scheme === 'file') {
-                const content = fs.readFileSync(uri.fsPath, 'utf-8');
-                const lines = content.split('\n');
-                const elementName = element.getAttribute('name');
-                if (elementName) {
-                    for (let i = 0; i < lines.length; i++) {
-                        if (lines[i].includes(`name="${elementName}"`)) {
-                            return i;
-                        }
-                    }
-                }
-            }
-        } catch (error) {
-            console.error('Error getting element line number:', error);
-        }
-        return 0;
     }
 
     private selectElements(xpathExpr: string, context?: Element): Element[] {
@@ -422,7 +415,8 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode> {
                             name: value,
                             type: '',
                             hasChildren: false,
-                            sourceUri: this.editor?.document.uri
+                            sourceUri: this.editor?.document.uri,
+                            xpath: this.generateXPathForElement(enumElement)
                         });
                     }
                     
@@ -632,42 +626,31 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode> {
     }
 
     private generateXPathForElement(element: Element): string {
-        const localName = element.localName || element.nodeName.split(':').pop() || '';
-        const name = element.getAttribute('name');
-        
-        let parent = element.parentNode;
-        if (!parent || parent.nodeType !== 1) {
-            return `//*[local-name()='${localName}']${name ? `[@name='${name}']` : ''}`;
-        }
-        
-        const parentEl = parent as Element;
-        const parentLocalName = parentEl.localName || parentEl.nodeName.split(':').pop() || '';
-        const parentName = parentEl.getAttribute('name');
-        
-        let xpath = '';
-        
-        if (parentName) {
-            xpath = `//*[local-name()='${parentLocalName}'][@name='${parentName}']`;
-        } else {
-            let grandparent = parent.parentNode;
-            if (grandparent && grandparent.nodeType === 1) {
-                const grandparentEl = grandparent as Element;
-                const grandparentLocalName = grandparentEl.localName || grandparentEl.nodeName.split(':').pop() || '';
-                const grandparentName = grandparentEl.getAttribute('name');
-                
-                if (grandparentName) {
-                    xpath = `//*[local-name()='${grandparentLocalName}'][@name='${grandparentName}']/*[local-name()='${parentLocalName}']`;
-                } else {
-                    xpath = `//*[local-name()='${parentLocalName}']`;
+        function buildPath(el: Element | null): string {
+            if (!el || el.nodeType !== 1) return '';
+            const localName = el.localName || el.nodeName.split(':').pop() || '';
+            let segment = `*[local-name()='${localName}']`;
+            if (localName === 'enumeration') {
+                const valueAttr = el.getAttribute && el.getAttribute('value');
+                if (valueAttr) {
+                    segment += `[@value='${valueAttr}']`;
                 }
             } else {
-                xpath = `//*[local-name()='${parentLocalName}']`;
+                const nameAttr = el.getAttribute && el.getAttribute('name');
+                if (nameAttr) {
+                    segment += `[@name='${nameAttr}']`;
+                }
+            }
+            const parent = el.parentNode as Element | null;
+            if (!parent || parent.nodeType !== 1) {
+                return segment;
+            } else {
+                return buildPath(parent) + '/' + segment;
             }
         }
-        
-        xpath += `/*[local-name()='${localName}']${name ? `[@name='${name}']` : ''}`;
-        
-        return xpath;
+
+        const path = buildPath(element);
+        return `//${path}`;
     }
 
     public async focusElement(elementXpath?: string): Promise<boolean> {
@@ -733,5 +716,13 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode> {
             console.error('Error focusing element:', error);
             return false;
         }
+    }
+
+    public expandAll(): void {
+        vscode.commands.executeCommand('workbench.actions.treeView.xsdOutline.expandAll');
+    }
+
+    public collapseAll(): void {
+        vscode.commands.executeCommand('workbench.actions.treeView.xsdOutline.collapseAll');
     }
 }

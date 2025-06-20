@@ -3,7 +3,7 @@ import { XsdOutlineProvider } from './xsdOutline';
 import { XsdDecorationProvider } from './xsdNodeDecorationProvider';
 
 export function activate(context: vscode.ExtensionContext) {
-    const provider = new XsdOutlineProvider(context);
+    const provider = new XsdOutlineProvider();
     
     context.subscriptions.push(
         vscode.window.registerTreeDataProvider('xsdOutline', provider),
@@ -13,10 +13,22 @@ export function activate(context: vscode.ExtensionContext) {
         }),
         vscode.commands.registerCommand('xsdOutline.refresh', () => {
             provider.refresh();
+        }),
+        vscode.commands.registerCommand('xsdOutline.collapseAll', () => {
+            provider.collapseAll();
         })
     );
     
     vscode.commands.executeCommand('setContext', 'xsdOutlineEnabled', false);
+
+    const treeView = vscode.window.createTreeView('xsdOutline', {
+        treeDataProvider: provider,
+        showCollapseAll: true
+    });
+
+    treeView.onDidChangeVisibility(e => {
+        vscode.commands.executeCommand('setContext', 'xsdOutlineActive', e.visible);
+    });
 }
 
 export function deactivate() {}
