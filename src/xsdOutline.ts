@@ -616,57 +616,31 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
     }
 
     private generateXPathForElement(element: Element): string {
-        const localName = element.localName || element.nodeName.split(':').pop() || '';
-        const name = element.getAttribute('name');
-        
-        if (localName === 'enumeration') {
-            const value = element.getAttribute('value');
-            let parent = element.parentNode;
-            while (parent && (parent as Element).localName !== 'simpleType') {
-                parent = parent.parentNode;
-            }
-            if (parent && (parent as Element).getAttribute) {
-                const simpleTypeName = (parent as Element).getAttribute('name');
-                if (simpleTypeName) {
-                    return `//*[local-name()='simpleType'][@name='${simpleTypeName}']//enumeration[@value='${value}']`;
-                }
-            }
-            return `//enumeration[@value='${value}']`;
-        }
-        
-        let parent = element.parentNode;
-        if (!parent || parent.nodeType !== 1) {
-            return `//*[local-name()='${localName}']${name ? `[@name='${name}']` : ''}`;
-        }
-        
-        const parentEl = parent as Element;
-        const parentLocalName = parentEl.localName || parentEl.nodeName.split(':').pop() || '';
-        const parentName = parentEl.getAttribute('name');
-        
-        let xpath = '';
-        
-        if (parentName) {
-            xpath = `//*[local-name()='${parentLocalName}'][@name='${parentName}']`;
-        } else {
-            let grandparent = parent.parentNode;
-            if (grandparent && grandparent.nodeType === 1) {
-                const grandparentEl = grandparent as Element;
-                const grandparentLocalName = grandparentEl.localName || grandparentEl.nodeName.split(':').pop() || '';
-                const grandparentName = grandparentEl.getAttribute('name');
-                
-                if (grandparentName) {
-                    xpath = `//*[local-name()='${grandparentLocalName}'][@name='${grandparentName}']/*[local-name()='${parentLocalName}']`;
-                } else {
-                    xpath = `//*[local-name()='${parentLocalName}']`;
+        function buildPath(el: Element | null): string {
+            if (!el || el.nodeType !== 1) return '';
+            const localName = el.localName || el.nodeName.split(':').pop() || '';
+            let segment = `*[local-name()='${localName}']`;
+            if (localName === 'enumeration') {
+                const valueAttr = el.getAttribute && el.getAttribute('value');
+                if (valueAttr) {
+                    segment += `[@value='${valueAttr}']`;
                 }
             } else {
-                xpath = `//*[local-name()='${parentLocalName}']`;
+                const nameAttr = el.getAttribute && el.getAttribute('name');
+                if (nameAttr) {
+                    segment += `[@name='${nameAttr}']`;
+                }
+            }
+            const parent = el.parentNode as Element | null;
+            if (!parent || parent.nodeType !== 1) {
+                return segment;
+            } else {
+                return buildPath(parent) + '/' + segment;
             }
         }
-        
-        xpath += `/*[local-name()='${localName}']${name ? `[@name='${name}']` : ''}`;
-        
-        return xpath;
+
+        const path = buildPath(element);
+        return `//${path}`;
     }
 
     public async focusElement(elementXpath?: string): Promise<boolean> {
