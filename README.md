@@ -7,7 +7,7 @@ This VSCode extension provide a XML-schema tree view for elements.
 
 - Provide Treeview in Explorer tab for elements in XML-schema (files with XML extension and namespace "http://www.w3.org/2001/XMLSchema")
 - Auto update view when document updates
-- Support extension, choice types
+- Support extension, choice, enum types
 - Support local imports
 - Highlight nilable values
 - Display minOccurs and maxOccurs attributes
