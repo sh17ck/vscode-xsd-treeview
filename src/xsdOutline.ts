@@ -717,4 +717,12 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
             return false;
         }
     }
+
+    public expandAll(): void {
+        vscode.commands.executeCommand('workbench.actions.treeView.xsdOutline.expandAll');
+    }
+
+    public collapseAll(): void {
+        vscode.commands.executeCommand('workbench.actions.treeView.xsdOutline.collapseAll');
+    }
 }
