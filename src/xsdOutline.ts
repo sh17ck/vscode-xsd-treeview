@@ -405,7 +405,8 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
                             name: value,
                             type: '',
                             hasChildren: false,
-                            sourceUri: this.editor?.document.uri
+                            sourceUri: this.editor?.document.uri,
+                            xpath: this.generateXPathForElement(enumElement)
                         });
                     }
                     
@@ -617,6 +618,21 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
     private generateXPathForElement(element: Element): string {
         const localName = element.localName || element.nodeName.split(':').pop() || '';
         const name = element.getAttribute('name');
+        
+        if (localName === 'enumeration') {
+            const value = element.getAttribute('value');
+            let parent = element.parentNode;
+            while (parent && (parent as Element).localName !== 'simpleType') {
+                parent = parent.parentNode;
+            }
+            if (parent && (parent as Element).getAttribute) {
+                const simpleTypeName = (parent as Element).getAttribute('name');
+                if (simpleTypeName) {
+                    return `//*[local-name()='simpleType'][@name='${simpleTypeName}']//enumeration[@value='${value}']`;
+                }
+            }
+            return `//enumeration[@value='${value}']`;
+        }
         
         let parent = element.parentNode;
         if (!parent || parent.nodeType !== 1) {
