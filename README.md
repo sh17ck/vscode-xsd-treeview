@@ -1,3 +1,7 @@
+<div style="text-align: right">
+	<strong><a href="/README.ru.md">На русском</a></strong>
+</div>
+
 # XSD Treeview Extension for Visual Studio Code
 This VSCode extension provide a XML-schema tree view for elements.
 

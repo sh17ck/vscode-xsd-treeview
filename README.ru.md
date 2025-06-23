@@ -1,3 +1,7 @@
+<div style="text-align: right">
+	<strong><a href="/README.md">On English</a></strong>
+</div>
+
 # Расширение для отображения дерева XSD в Visual Studio Code
 Это расширение предоставляет возможность просматривать XML-схему элементов.
 
