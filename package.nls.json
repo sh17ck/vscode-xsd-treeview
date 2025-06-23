@@ -1,5 +1,5 @@
 {
-  "extension.name": "XSD Treeview",
+  "extension.displayName": "XSD Treeview",
   "extension.description": "Provide a XML-schema tree view for elements.",
   "command.refresh": "Refresh",
   "command.collapseAll": "Collapse All",
