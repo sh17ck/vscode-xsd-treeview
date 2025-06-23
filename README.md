@@ -1,7 +1,7 @@
 # XSD Treeview Extension for Visual Studio Code
 This VSCode extension provide a XML-schema tree view for elements.
 
-![Treeview screenshot](/images/screenshot_0.png)
+![Extension screenshot](/images/screenshot_0.png)
 
 ## Features
 
@@ -20,6 +20,6 @@ This VSCode extension provide a XML-schema tree view for elements.
 - Nilable values has subdued font color
 - If an element has minOccurs or maxOccurs - this is displayed on the right side of the tree element:
 	- 1 for defaults
-	- N for specific values
+	- N for specific values more than 1
 	- ∞ for unbounded
 - Information about the attributes above is duplicated in the tooltip
