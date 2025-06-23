@@ -2,6 +2,7 @@
   "name": "vscode-xsd-treeview",
   "displayName": "%extension.displayName%",
   "description": "%extension.description%",
+  "icon": "images/xsd-treeview-icon.png",
   "publisher": "sh17ck",
   "license": "MIT",
   "version": "0.0.3",

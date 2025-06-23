@@ -1,7 +1,7 @@
 # XSD Treeview Extension for Visual Studio Code
 This VSCode extension provide a XML-schema tree view for elements.
 
-![Treeview screenshot](/resources/screenshot_0.png)
+![Treeview screenshot](/images/screenshot_0.png)
 
 ## Features
 
