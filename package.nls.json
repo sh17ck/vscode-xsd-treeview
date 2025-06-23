@@ -1,0 +1,9 @@
+{
+  "extension.name": "XSD Treeview",
+  "extension.description": "Provide a XML-schema tree view for elements.",
+  "command.refresh": "Refresh",
+  "command.collapseAll": "Collapse All",
+  "command.openSelection": "Open XSD Selection",
+  "treeview.name": "XSD Outline",
+  "treeview.autorefresh.description": "Automatically refresh the outline when the document changes"
+} 

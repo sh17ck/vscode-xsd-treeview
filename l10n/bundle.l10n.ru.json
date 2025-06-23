@@ -1,0 +1,6 @@
+{
+  "error.parsingDocument": "Ошибка разбора документа: {0}",
+  "error.loadingSchema": "Ошибка загрузки схемы: {0}",
+  "error.cantFindImportedSchema": "Не удалось найти импортированную схему: {0}",
+  "error.cantLoadImportedSchema": "Не удалось загрузить импортированную схему: {0}"
+} 

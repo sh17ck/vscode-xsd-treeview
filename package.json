@@ -1,10 +1,11 @@
 {
   "name": "vscode-xsd-treeview",
-  "displayName": "XSD Treeview",
+  "displayName": "%extension.displayName%",
+  "description": "%extension.description%",
+  "icon": "images/xsd-treeview-icon.png",
   "publisher": "sh17ck",
-  "description": "This VSCode extension provide a XML-schema tree view for elements.",
   "license": "MIT",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "repository": {
     "type": "git",
     "url": "https://github.com/sh17ck/vscode-xsd-treeview.git"
@@ -22,12 +23,13 @@
     "onLanguage:xml"
   ],
   "main": "./dist/extension.js",
+	"l10n": "./l10n",
   "contributes": {
     "views": {
       "explorer": [
         {
           "id": "xsdOutline",
-          "name": "XSD Outline",
+          "name": "%treeview.name%",
           "when": "xsdOutlineEnabled"
         }
       ]
@@ -35,26 +37,26 @@
     "commands": [
       {
         "command": "xsdOutline.refresh",
-        "title": "Refresh",
+        "title": "%command.refresh%",
         "icon": "$(refresh)"
       },
       {
         "command": "xsdOutline.collapseAll",
-        "title": "Collapse All",
+        "title": "%command.collapseAll%",
         "icon": "$(collapse-all)"
       },
       {
         "command": "xsdOutline.openSelection",
-        "title": "Open XSD Selection"
+        "title": "%command.openSelection%"
       }
     ],
     "configuration": {
-      "title": "XSD Outline",
+      "title": "%treeview.name%",
       "properties": {
         "xsdOutline.autorefresh": {
           "type": "boolean",
           "default": true,
-          "description": "Automatically refresh the outline when the document changes"
+          "description": "%treeview.autorefresh.description%"
         }
       }
     },
@@ -99,6 +101,7 @@
     "typescript": "^5.8.3"
   },
   "dependencies": {
+    "@vscode/l10n": "^0.0.18",
     "xmldom": "^0.6.0",
     "xpath": "^0.0.34"
   }

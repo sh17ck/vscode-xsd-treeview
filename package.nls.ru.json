@@ -1,0 +1,9 @@
+{
+  "extension.displayName": "Структура XSD",
+  "extension.description": "Предоставляет возможность просматривать XML-схему элементов в виде дерева.",
+  "command.refresh": "Обновить",
+  "command.collapseAll": "Свернуть всё",
+  "command.openSelection": "Открыть элемент XSD",
+  "treeview.name": "Структура XSD",
+  "treeview.autorefresh.description": "Автоматически обновлять структуру при изменении документа"
+} 
