@@ -16,6 +16,10 @@ export function activate(context: vscode.ExtensionContext) {
         }),
         vscode.commands.registerCommand('xsdOutline.collapseAll', () => {
             provider.collapseAll();
+        }),
+        vscode.commands.registerCommand('xsdOutline.copyName', async (element?: { name?: string }) => {
+            const name = element && typeof element.name === 'string' ? element.name : '';
+            await vscode.env.clipboard.writeText(name);
         })
     );
     

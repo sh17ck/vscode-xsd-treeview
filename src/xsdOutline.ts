@@ -339,6 +339,10 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
                 treeItem.iconPath = new vscode.ThemeIcon('symbol-field');
         }
         
+        if (node.name) {
+            treeItem.contextValue = 'xsdNodeWithName';
+        }
+        
         return treeItem;
     }
 

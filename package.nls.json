@@ -4,6 +4,7 @@
   "command.refresh": "Refresh",
   "command.collapseAll": "Collapse All",
   "command.openSelection": "Open XSD Selection",
+  "command.copyName": "Copy name",
   "treeview.name": "XSD Outline",
   "treeview.autorefresh.description": "Automatically refresh the outline when the document changes"
 } 

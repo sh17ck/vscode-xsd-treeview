@@ -19,6 +19,7 @@ This VSCode extension provide a XML-schema tree view for elements.
 - Documentation in tooltips
 - Different icons for different types
 - Also show type in description of the tree element
+- Copying element's name to the clipboard
 
 ## Attributes
 

@@ -4,6 +4,7 @@
   "command.refresh": "Обновить",
   "command.collapseAll": "Свернуть всё",
   "command.openSelection": "Открыть элемент XSD",
+  "command.copyName": "Копировать имя",
   "treeview.name": "Структура XSD",
   "treeview.autorefresh.description": "Автоматически обновлять структуру при изменении документа"
 } 
