@@ -1,5 +1,5 @@
 <div>
-	<strong><a href="/README.ru.md">На русском</a></strong>
+	<strong><a href="https://github.com/sh17ck/vscode-xsd-treeview/blob/master/README.ru.md">На русском</a></strong>
 </div>
 
 # XSD Treeview Extension for Visual Studio Code

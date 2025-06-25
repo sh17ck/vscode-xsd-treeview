@@ -1,5 +1,5 @@
 <div>
-	<strong><a href="/README.md">On English</a></strong>
+	<strong><a href="https://github.com/sh17ck/vscode-xsd-treeview/blob/master/README.md">On English</a></strong>
 </div>
 
 # Расширение для отображения структуры XSD в Visual Studio Code
