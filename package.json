@@ -5,7 +5,7 @@
   "icon": "images/xsd-treeview-icon.png",
   "publisher": "sh17ck",
   "license": "MIT",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "repository": {
     "type": "git",
     "url": "https://github.com/sh17ck/vscode-xsd-treeview.git"
@@ -48,6 +48,11 @@
       {
         "command": "xsdOutline.openSelection",
         "title": "%command.openSelection%"
+      },
+      {
+        "command": "xsdOutline.copyName",
+        "title": "%command.copyName%",
+        "icon": "$(copy)"
       }
     ],
     "configuration": {
@@ -68,6 +73,14 @@
           "when": "view == xsdOutline",
           "group": "navigation",
           "icon": "$(refresh)"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "xsdOutline.copyName",
+          "when": "view == xsdOutline && xsdOutlineEnabled",
+          "group": "inline",
+          "args": ["${treeItem.label}"]
         }
       ]
     }

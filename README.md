@@ -1,5 +1,5 @@
 <div>
-	<strong><a href="/README.ru.md">На русском</a></strong>
+	<strong><a href="https://github.com/sh17ck/vscode-xsd-treeview/blob/master/README.ru.md">На русском</a></strong>
 </div>
 
 # XSD Treeview Extension for Visual Studio Code
@@ -19,6 +19,7 @@ This VSCode extension provide a XML-schema tree view for elements.
 - Documentation in tooltips
 - Different icons for different types
 - Also show type in description of the tree element
+- Copying element's name to the clipboard
 
 ## Attributes
 

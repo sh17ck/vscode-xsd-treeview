@@ -1,5 +1,5 @@
 <div>
-	<strong><a href="/README.md">On English</a></strong>
+	<strong><a href="https://github.com/sh17ck/vscode-xsd-treeview/blob/master/README.md">On English</a></strong>
 </div>
 
 # Расширение для отображения структуры XSD в Visual Studio Code
@@ -19,6 +19,7 @@
 - Отображение документации во всплывающей подсказке
 - Различные иконки в зависимости от типа элемента схемы
 - Отображение типа элемента в его описании
+- Копирование имени элемента в буфер обмена
 
 ## Атрибуты
 

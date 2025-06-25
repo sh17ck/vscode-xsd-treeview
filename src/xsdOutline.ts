@@ -105,7 +105,7 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
             }
             this._onDidChangeTreeData.fire(undefined);
         } catch (error) {
-            vscode.window.showErrorMessage(l10n.t('error.parsingDocument', error instanceof Error ? error.message : String(error)));
+            vscode.window.showErrorMessage(l10n.t('Error parsing document: {0}', error instanceof Error ? error.message : String(error)));
             console.error('Error parsing document:', error);
         }
     }
@@ -126,7 +126,7 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
         try {
             const importedUri = await this.resolveSchemaLocation(baseUri, schemaLocation);
             if (!importedUri) {
-                vscode.window.showErrorMessage(l10n.t('error.cantFindImportedSchema', schemaLocation));
+                vscode.window.showErrorMessage(l10n.t("Can't find imported schema: {0}", schemaLocation));
                 return;
             }
             const importedDoc = await this.loadSchemaDocumentWithCache(importedUri);
@@ -134,10 +134,10 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
                 const namespace = importEl.getAttribute('namespace') || '';
                 this.importedDocuments.set(namespace, {doc: importedDoc, uri: importedUri});
             } else {
-                vscode.window.showErrorMessage(l10n.t('error.cantLoadImportedSchema', schemaLocation));
+                vscode.window.showErrorMessage(l10n.t("Can't load imported schema: {0}", schemaLocation));
             }
         } catch (error) {
-            vscode.window.showErrorMessage(l10n.t('error.cantLoadImportedSchema', (error instanceof Error ? error.message : String(error))));
+            vscode.window.showErrorMessage(l10n.t("Can't load imported schema: {0}", (error instanceof Error ? error.message : String(error))));
             console.error(`Error loading imported schema ${schemaLocation}:`, error);
         }
     }
@@ -194,7 +194,7 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
                 return doc;
             }
         } catch (error) {
-            vscode.window.showErrorMessage(l10n.t('error.loadingSchema', error instanceof Error ? error.message : String(error)));
+            vscode.window.showErrorMessage(l10n.t('Error loading schema: {0}', error instanceof Error ? error.message : String(error)));
             console.error('Error loading schema document:', error);
             return undefined;
         }
@@ -337,6 +337,10 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
                 break;
             default:
                 treeItem.iconPath = new vscode.ThemeIcon('symbol-field');
+        }
+        
+        if (node.name) {
+            treeItem.contextValue = 'xsdNodeWithName';
         }
         
         return treeItem;
