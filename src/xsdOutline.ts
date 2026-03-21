@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as xpath from 'xpath';
-import * as xmldom from 'xmldom';
+import * as xmldom from '@xmldom/xmldom';
 import * as path from 'path';
 import * as fs from 'fs';
 import { XsdDecorationProvider } from './xsdNodeDecorationProvider';
