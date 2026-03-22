@@ -351,6 +351,9 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
             case 'enumeration':
                 treeItem.iconPath = new vscode.ThemeIcon('symbol-enum-member');
                 break;
+            case 'any':
+                treeItem.iconPath = new vscode.ThemeIcon('symbol-variable');
+                break;
             default:
                 treeItem.iconPath = new vscode.ThemeIcon('symbol-field');
         }
@@ -468,8 +471,11 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
             else if (localName === 'group') {
                 children.push(...this.getGroupChildren(child));
             }
+            else if (localName === 'any') {
+                children.push(this.createAnyNode(child));
+            }
             else if (localName === 'sequence' || localName === 'all') {
-                const nestedElements = this.selectElements("./*[local-name()='element' or local-name()='choice' or local-name()='group']", child);
+                const nestedElements = this.selectElements("./*[local-name()='element' or local-name()='choice' or local-name()='group' or local-name()='any']", child);
                 nestedElements.forEach(el => {
                     const nestedLocalName = el.localName || el.nodeName.split(':').pop() || '';
                     if (nestedLocalName === 'element') {
@@ -478,6 +484,8 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
                         children.push(this.createChoiceNode(el));
                     } else if (nestedLocalName === 'group') {
                         children.push(...this.getGroupChildren(el));
+                    } else if (nestedLocalName === 'any') {
+                        children.push(this.createAnyNode(el));
                     }
                 });
             }
@@ -552,7 +560,7 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
             
             const extensionGroups = this.selectElements("./*[local-name()='sequence' or local-name()='choice' or local-name()='all']", extension);
             for (const group of extensionGroups) {
-                const elements = this.selectElements("./*[local-name()='element' or local-name()='choice' or local-name()='group']", group);
+                const elements = this.selectElements("./*[local-name()='element' or local-name()='choice' or local-name()='group' or local-name()='any']", group);
                 for (const el of elements) {
                     const localName = el.localName || el.nodeName.split(':').pop() || '';
                     if (localName === 'element') {
@@ -561,6 +569,8 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
                         children.push(this.createChoiceNode(el));
                     } else if (localName === 'group') {
                         children.push(...this.getGroupChildren(el));
+                    } else if (localName === 'any') {
+                        children.push(this.createAnyNode(el));
                     }
                 }
             }
@@ -573,7 +583,7 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
             if (groupType === 'choice') {
                 children.push(this.createChoiceNode(group));
             } else {
-                const elements = this.selectElements("./*[local-name()='element' or local-name()='choice' or local-name()='group']", group);
+                const elements = this.selectElements("./*[local-name()='element' or local-name()='choice' or local-name()='group' or local-name()='any']", group);
                 elements.forEach(el => {
                     const localName = el.localName || el.nodeName.split(':').pop() || '';
                     if (localName === 'element') {
@@ -582,12 +592,14 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
                         children.push(this.createChoiceNode(el));
                     } else if (localName === 'group') {
                         children.push(...this.getGroupChildren(el));
+                    } else if (localName === 'any') {
+                        children.push(this.createAnyNode(el));
                     }
                 });
             }
         });
         
-        const directElements = this.selectElements("./*[local-name()='element' or local-name()='choice' or local-name()='group']", complexType);
+        const directElements = this.selectElements("./*[local-name()='element' or local-name()='choice' or local-name()='group' or local-name()='any']", complexType);
         directElements.forEach(el => {
             const localName = el.localName || el.nodeName.split(':').pop() || '';
             if (localName === 'element') {
@@ -596,6 +608,15 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
                 children.push(this.createChoiceNode(el));
             } else if (localName === 'group') {
                 children.push(...this.getGroupChildren(el));
+            } else if (localName === 'any') {
+                children.push(this.createAnyNode(el));
+            }
+        });
+        
+        const anyElements = this.selectElements(".//*[local-name()='any']", complexType);
+        anyElements.forEach(el => {
+            if (!children.some(child => child.element === el)) {
+                children.push(this.createAnyNode(el));
             }
         });
         
@@ -614,29 +635,37 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
         };
     }
 
+    private createAnyNode(anyElement: Element): XsdNode {
+        return {
+            element: anyElement,
+            name: '<any>',
+            type: '',
+            hasChildren: false,
+            sourceUri: this.editor?.document.uri,
+            xpath: this.generateXPathForElement(anyElement)
+        };
+    }
+
     private getGroupChildren(groupElement: Element): XsdNode[] {
         const children: XsdNode[] = [];
         const ref = groupElement.getAttribute('ref');
         let targetGroup: Element | null = null;
         
         if (ref) {
-            // Find group definition by name (strip namespace prefix)
             const groupName = ref.split(':').pop() || '';
             const groupDefs = this.selectElements(`//*[local-name()='group'][@name='${groupName}']`);
             if (groupDefs.length > 0) {
                 targetGroup = groupDefs[0];
             } else {
-                // If not found, return empty
                 return children;
             }
         } else {
             targetGroup = groupElement;
         }
         
-        // Get sequence, choice, all inside group
         const containers = this.selectElements("./*[local-name()='sequence' or local-name()='choice' or local-name()='all']", targetGroup);
         for (const container of containers) {
-            const elements = this.selectElements("./*[local-name()='element' or local-name()='choice' or local-name()='group']", container);
+            const elements = this.selectElements("./*[local-name()='element' or local-name()='choice' or local-name()='group' or local-name()='any']", container);
             for (const el of elements) {
                 const localName = el.localName || el.nodeName.split(':').pop() || '';
                 if (localName === 'element') {
@@ -644,13 +673,13 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
                 } else if (localName === 'choice') {
                     children.push(this.createChoiceNode(el));
                 } else if (localName === 'group') {
-                    // Recursively include group children (nested groups)
                     children.push(...this.getGroupChildren(el));
+                } else if (localName === 'any') {
+                    children.push(this.createAnyNode(el));
                 }
             }
         }
-        // Also handle direct elements under group (though XSD spec may not allow)
-        const directElements = this.selectElements("./*[local-name()='element' or local-name()='choice' or local-name()='group']", targetGroup);
+        const directElements = this.selectElements("./*[local-name()='element' or local-name()='choice' or local-name()='group' or local-name()='any']", targetGroup);
         for (const el of directElements) {
             const localName = el.localName || el.nodeName.split(':').pop() || '';
             if (localName === 'element') {
@@ -659,6 +688,8 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
                 children.push(this.createChoiceNode(el));
             } else if (localName === 'group') {
                 children.push(...this.getGroupChildren(el));
+            } else if (localName === 'any') {
+                children.push(this.createAnyNode(el));
             }
         }
         return children;
@@ -682,12 +713,12 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
         
         const xpath = this.generateXPathForElement(element);
         
-        const hasTypeChildren = type ? 
-            this.selectElements(`//*[local-name()='complexType'][@name='${type.split(':').pop()}']/*[local-name()='sequence' or local-name()='choice' or local-name()='all']/*[local-name()='element']`).length > 0 : 
+        const hasTypeChildren = type ?
+            this.selectElements(`//*[local-name()='complexType'][@name='${type.split(':').pop()}']/*[local-name()='sequence' or local-name()='choice' or local-name()='all']/*[local-name()='element' or local-name()='choice' or local-name()='group' or local-name()='any']`).length > 0 :
             false;
             
-        const hasDirectChildren = this.selectElements("./*[local-name()='element']", element).length > 0 ||
-            this.selectElements("./*[local-name()='complexType']/*[local-name()='sequence' or local-name()='choice' or local-name()='all']/*[local-name()='element']", element).length > 0;
+        const hasDirectChildren = this.selectElements("./*[local-name()='element' or local-name()='choice' or local-name()='group' or local-name()='any']", element).length > 0 ||
+            this.selectElements("./*[local-name()='complexType']/*[local-name()='sequence' or local-name()='choice' or local-name()='all']/*[local-name()='element' or local-name()='choice' or local-name()='group' or local-name()='any']", element).length > 0;
         
         const hasExtensionChildren = type ? 
             this.selectElements(`//*[local-name()='complexType'][@name='${type.split(':').pop()}']/*[local-name()='complexContent']/*[local-name()='extension']`).length > 0 : 
