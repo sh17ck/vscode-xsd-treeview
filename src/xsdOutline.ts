@@ -25,10 +25,12 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
     private isXsdDocument = false;
     private importedDocuments = new Map<string, {doc: Document, uri: vscode.Uri}>();
     private importedSchemaCache = new Map<string, {doc: Document, mtimeMs: number}>();
+    private outputChannel: vscode.OutputChannel;
 
     private disposables: vscode.Disposable[] = [];
 
-    constructor() {
+    constructor(outputChannel: vscode.OutputChannel) {
+        this.outputChannel = outputChannel;
         this.disposables.push(
             vscode.window.onDidChangeActiveTextEditor(() => this.checkDocument()),
             vscode.workspace.onDidChangeTextDocument((e) => {
@@ -43,6 +45,23 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
             })
         );
         this.checkDocument();
+    }
+
+    private logError(message: string, error?: any): void {
+        const fullMessage = error ? `${message}: ${error instanceof Error ? error.message : String(error)}` : message;
+        this.outputChannel.appendLine(`[ERROR] ${fullMessage}`);
+        console.error(message, error);
+    }
+
+    private logWarning(message: string, error?: any): void {
+        const fullMessage = error ? `${message}: ${error instanceof Error ? error.message : String(error)}` : message;
+        this.outputChannel.appendLine(`[WARN] ${fullMessage}`);
+        console.warn(message, error);
+    }
+
+    private logInfo(message: string): void {
+        this.outputChannel.appendLine(`[INFO] ${message}`);
+        console.log(message);
     }
 
     dispose() {
@@ -105,8 +124,7 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
             }
             this._onDidChangeTreeData.fire(undefined);
         } catch (error) {
-            vscode.window.showErrorMessage(l10n.t('Error parsing document: {0}', error instanceof Error ? error.message : String(error)));
-            console.error('Error parsing document:', error);
+            this.logError(l10n.t('Error parsing document'), error);
         }
     }
 
@@ -126,7 +144,7 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
         try {
             const importedUri = await this.resolveSchemaLocation(baseUri, schemaLocation);
             if (!importedUri) {
-                vscode.window.showErrorMessage(l10n.t("Can't find imported schema: {0}", schemaLocation));
+                this.logWarning(l10n.t("Can't find imported schema: {0}", schemaLocation));
                 return;
             }
             const importedDoc = await this.loadSchemaDocumentWithCache(importedUri);
@@ -134,11 +152,10 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
                 const namespace = importEl.getAttribute('namespace') || '';
                 this.importedDocuments.set(namespace, {doc: importedDoc, uri: importedUri});
             } else {
-                vscode.window.showErrorMessage(l10n.t("Can't load imported schema: {0}", schemaLocation));
+                this.logWarning(l10n.t("Can't load imported schema: {0}", schemaLocation));
             }
         } catch (error) {
-            vscode.window.showErrorMessage(l10n.t("Can't load imported schema: {0}", (error instanceof Error ? error.message : String(error))));
-            console.error(`Error loading imported schema ${schemaLocation}:`, error);
+            this.logError(l10n.t("Can't load imported schema: {0}", schemaLocation), error);
         }
     }
 
@@ -170,7 +187,7 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
 
             return undefined;
         } catch (error) {
-            console.error('Error resolving schema location:', error);
+            this.logError('Error resolving schema location', error);
             return undefined;
         }
     }
@@ -194,8 +211,7 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
                 return doc;
             }
         } catch (error) {
-            vscode.window.showErrorMessage(l10n.t('Error loading schema: {0}', error instanceof Error ? error.message : String(error)));
-            console.error('Error loading schema document:', error);
+            this.logError(l10n.t('Error loading schema'), error);
             return undefined;
         }
     }
@@ -233,7 +249,7 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
 
             return elements;
         } catch (error) {
-            console.error('XPath error:', error);
+            this.logError('XPath error', error);
             return [];
         }
     }
@@ -361,7 +377,7 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
             
             return docText.trim();
         } catch (error) {
-            console.error('Error getting documentation:', error);
+            this.logError('Error getting documentation', error);
             return undefined;
         }
     }
@@ -699,7 +715,7 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
                     }
                 }
             } catch (error) {
-                console.error('XPath search error:', error);
+                this.logError('XPath search error', error);
             }
         }
         
@@ -718,7 +734,7 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
             editor.revealRange(new vscode.Range(position, position));
             return true;
         } catch (error) {
-            console.error('Error focusing element:', error);
+            this.logError('Error focusing element', error);
             return false;
         }
     }
