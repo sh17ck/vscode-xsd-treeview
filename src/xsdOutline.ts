@@ -1,10 +1,10 @@
+import * as fs from 'fs';
+import * as path from 'path';
+import * as l10n from '@vscode/l10n';
+import * as xmldom from '@xmldom/xmldom';
 import * as vscode from 'vscode';
 import * as xpath from 'xpath';
-import * as xmldom from 'xmldom';
-import * as path from 'path';
-import * as fs from 'fs';
 import { XsdDecorationProvider } from './xsdNodeDecorationProvider';
-import * as l10n from '@vscode/l10n';
 
 interface XsdNode {
     element: Element;
@@ -25,10 +25,12 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
     private isXsdDocument = false;
     private importedDocuments = new Map<string, {doc: Document, uri: vscode.Uri}>();
     private importedSchemaCache = new Map<string, {doc: Document, mtimeMs: number}>();
+    private outputChannel: vscode.OutputChannel;
 
     private disposables: vscode.Disposable[] = [];
 
-    constructor() {
+    constructor(outputChannel: vscode.OutputChannel) {
+        this.outputChannel = outputChannel;
         this.disposables.push(
             vscode.window.onDidChangeActiveTextEditor(() => this.checkDocument()),
             vscode.workspace.onDidChangeTextDocument((e) => {
@@ -43,6 +45,23 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
             })
         );
         this.checkDocument();
+    }
+
+    private logError(message: string, error?: any): void {
+        const fullMessage = error ? `${message}: ${error instanceof Error ? error.message : String(error)}` : message;
+        this.outputChannel.appendLine(`[ERROR] ${fullMessage}`);
+        console.error(message, error);
+    }
+
+    private logWarning(message: string, error?: any): void {
+        const fullMessage = error ? `${message}: ${error instanceof Error ? error.message : String(error)}` : message;
+        this.outputChannel.appendLine(`[WARN] ${fullMessage}`);
+        console.warn(message, error);
+    }
+
+    private logInfo(message: string): void {
+        this.outputChannel.appendLine(`[INFO] ${message}`);
+        console.log(message);
     }
 
     dispose() {
@@ -105,8 +124,7 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
             }
             this._onDidChangeTreeData.fire(undefined);
         } catch (error) {
-            vscode.window.showErrorMessage(l10n.t('Error parsing document: {0}', error instanceof Error ? error.message : String(error)));
-            console.error('Error parsing document:', error);
+            this.logError(l10n.t('Error parsing document'), error);
         }
     }
 
@@ -126,7 +144,7 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
         try {
             const importedUri = await this.resolveSchemaLocation(baseUri, schemaLocation);
             if (!importedUri) {
-                vscode.window.showErrorMessage(l10n.t("Can't find imported schema: {0}", schemaLocation));
+                this.logWarning(l10n.t("Can't find imported schema: {0}", schemaLocation));
                 return;
             }
             const importedDoc = await this.loadSchemaDocumentWithCache(importedUri);
@@ -134,11 +152,10 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
                 const namespace = importEl.getAttribute('namespace') || '';
                 this.importedDocuments.set(namespace, {doc: importedDoc, uri: importedUri});
             } else {
-                vscode.window.showErrorMessage(l10n.t("Can't load imported schema: {0}", schemaLocation));
+                this.logWarning(l10n.t("Can't load imported schema: {0}", schemaLocation));
             }
         } catch (error) {
-            vscode.window.showErrorMessage(l10n.t("Can't load imported schema: {0}", (error instanceof Error ? error.message : String(error))));
-            console.error(`Error loading imported schema ${schemaLocation}:`, error);
+            this.logError(l10n.t("Can't load imported schema: {0}", schemaLocation), error);
         }
     }
 
@@ -170,7 +187,7 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
 
             return undefined;
         } catch (error) {
-            console.error('Error resolving schema location:', error);
+            this.logError('Error resolving schema location', error);
             return undefined;
         }
     }
@@ -194,8 +211,7 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
                 return doc;
             }
         } catch (error) {
-            vscode.window.showErrorMessage(l10n.t('Error loading schema: {0}', error instanceof Error ? error.message : String(error)));
-            console.error('Error loading schema document:', error);
+            this.logError(l10n.t('Error loading schema'), error);
             return undefined;
         }
     }
@@ -233,7 +249,7 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
 
             return elements;
         } catch (error) {
-            console.error('XPath error:', error);
+            this.logError('XPath error', error);
             return [];
         }
     }
@@ -335,6 +351,9 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
             case 'enumeration':
                 treeItem.iconPath = new vscode.ThemeIcon('symbol-enum-member');
                 break;
+            case 'any':
+                treeItem.iconPath = new vscode.ThemeIcon('symbol-variable');
+                break;
             default:
                 treeItem.iconPath = new vscode.ThemeIcon('symbol-field');
         }
@@ -361,7 +380,7 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
             
             return docText.trim();
         } catch (error) {
-            console.error('Error getting documentation:', error);
+            this.logError('Error getting documentation', error);
             return undefined;
         }
     }
@@ -445,18 +464,28 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
             
             if (localName === 'element') {
                 children.push(this.createNode(child));
-            } 
+            }
             else if (localName === 'choice') {
                 children.push(this.createChoiceNode(child));
             }
+            else if (localName === 'group') {
+                children.push(...this.getGroupChildren(child));
+            }
+            else if (localName === 'any') {
+                children.push(this.createAnyNode(child));
+            }
             else if (localName === 'sequence' || localName === 'all') {
-                const nestedElements = this.selectElements("./*[local-name()='element' or local-name()='choice']", child);
+                const nestedElements = this.selectElements("./*[local-name()='element' or local-name()='choice' or local-name()='group' or local-name()='any']", child);
                 nestedElements.forEach(el => {
                     const nestedLocalName = el.localName || el.nodeName.split(':').pop() || '';
                     if (nestedLocalName === 'element') {
                         children.push(this.createNode(el));
                     } else if (nestedLocalName === 'choice') {
                         children.push(this.createChoiceNode(el));
+                    } else if (nestedLocalName === 'group') {
+                        children.push(...this.getGroupChildren(el));
+                    } else if (nestedLocalName === 'any') {
+                        children.push(this.createAnyNode(el));
                     }
                 });
             }
@@ -531,13 +560,17 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
             
             const extensionGroups = this.selectElements("./*[local-name()='sequence' or local-name()='choice' or local-name()='all']", extension);
             for (const group of extensionGroups) {
-                const elements = this.selectElements("./*[local-name()='element' or local-name()='choice']", group);
+                const elements = this.selectElements("./*[local-name()='element' or local-name()='choice' or local-name()='group' or local-name()='any']", group);
                 for (const el of elements) {
                     const localName = el.localName || el.nodeName.split(':').pop() || '';
                     if (localName === 'element') {
                         children.push(this.createNode(el));
                     } else if (localName === 'choice') {
                         children.push(this.createChoiceNode(el));
+                    } else if (localName === 'group') {
+                        children.push(...this.getGroupChildren(el));
+                    } else if (localName === 'any') {
+                        children.push(this.createAnyNode(el));
                     }
                 }
             }
@@ -550,25 +583,40 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
             if (groupType === 'choice') {
                 children.push(this.createChoiceNode(group));
             } else {
-                const elements = this.selectElements("./*[local-name()='element' or local-name()='choice']", group);
+                const elements = this.selectElements("./*[local-name()='element' or local-name()='choice' or local-name()='group' or local-name()='any']", group);
                 elements.forEach(el => {
                     const localName = el.localName || el.nodeName.split(':').pop() || '';
                     if (localName === 'element') {
                         children.push(this.createNode(el));
                     } else if (localName === 'choice') {
                         children.push(this.createChoiceNode(el));
+                    } else if (localName === 'group') {
+                        children.push(...this.getGroupChildren(el));
+                    } else if (localName === 'any') {
+                        children.push(this.createAnyNode(el));
                     }
                 });
             }
         });
         
-        const directElements = this.selectElements("./*[local-name()='element' or local-name()='choice']", complexType);
+        const directElements = this.selectElements("./*[local-name()='element' or local-name()='choice' or local-name()='group' or local-name()='any']", complexType);
         directElements.forEach(el => {
             const localName = el.localName || el.nodeName.split(':').pop() || '';
             if (localName === 'element') {
                 children.push(this.createNode(el));
             } else if (localName === 'choice') {
                 children.push(this.createChoiceNode(el));
+            } else if (localName === 'group') {
+                children.push(...this.getGroupChildren(el));
+            } else if (localName === 'any') {
+                children.push(this.createAnyNode(el));
+            }
+        });
+        
+        const anyElements = this.selectElements(".//*[local-name()='any']", complexType);
+        anyElements.forEach(el => {
+            if (!children.some(child => child.element === el)) {
+                children.push(this.createAnyNode(el));
             }
         });
         
@@ -585,6 +633,66 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
             hasChildren: hasChildren,
             sourceUri: this.editor?.document.uri
         };
+    }
+
+    private createAnyNode(anyElement: Element): XsdNode {
+        return {
+            element: anyElement,
+            name: '<any>',
+            type: '',
+            hasChildren: false,
+            sourceUri: this.editor?.document.uri,
+            xpath: this.generateXPathForElement(anyElement)
+        };
+    }
+
+    private getGroupChildren(groupElement: Element): XsdNode[] {
+        const children: XsdNode[] = [];
+        const ref = groupElement.getAttribute('ref');
+        let targetGroup: Element | null = null;
+        
+        if (ref) {
+            const groupName = ref.split(':').pop() || '';
+            const groupDefs = this.selectElements(`//*[local-name()='group'][@name='${groupName}']`);
+            if (groupDefs.length > 0) {
+                targetGroup = groupDefs[0];
+            } else {
+                return children;
+            }
+        } else {
+            targetGroup = groupElement;
+        }
+        
+        const containers = this.selectElements("./*[local-name()='sequence' or local-name()='choice' or local-name()='all']", targetGroup);
+        for (const container of containers) {
+            const elements = this.selectElements("./*[local-name()='element' or local-name()='choice' or local-name()='group' or local-name()='any']", container);
+            for (const el of elements) {
+                const localName = el.localName || el.nodeName.split(':').pop() || '';
+                if (localName === 'element') {
+                    children.push(this.createNode(el));
+                } else if (localName === 'choice') {
+                    children.push(this.createChoiceNode(el));
+                } else if (localName === 'group') {
+                    children.push(...this.getGroupChildren(el));
+                } else if (localName === 'any') {
+                    children.push(this.createAnyNode(el));
+                }
+            }
+        }
+        const directElements = this.selectElements("./*[local-name()='element' or local-name()='choice' or local-name()='group' or local-name()='any']", targetGroup);
+        for (const el of directElements) {
+            const localName = el.localName || el.nodeName.split(':').pop() || '';
+            if (localName === 'element') {
+                children.push(this.createNode(el));
+            } else if (localName === 'choice') {
+                children.push(this.createChoiceNode(el));
+            } else if (localName === 'group') {
+                children.push(...this.getGroupChildren(el));
+            } else if (localName === 'any') {
+                children.push(this.createAnyNode(el));
+            }
+        }
+        return children;
     }
 
     private createNode(element: Element): XsdNode {
@@ -605,12 +713,12 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
         
         const xpath = this.generateXPathForElement(element);
         
-        const hasTypeChildren = type ? 
-            this.selectElements(`//*[local-name()='complexType'][@name='${type.split(':').pop()}']/*[local-name()='sequence' or local-name()='choice' or local-name()='all']/*[local-name()='element']`).length > 0 : 
+        const hasTypeChildren = type ?
+            this.selectElements(`//*[local-name()='complexType'][@name='${type.split(':').pop()}']/*[local-name()='sequence' or local-name()='choice' or local-name()='all']/*[local-name()='element' or local-name()='choice' or local-name()='group' or local-name()='any']`).length > 0 :
             false;
             
-        const hasDirectChildren = this.selectElements("./*[local-name()='element']", element).length > 0 ||
-            this.selectElements("./*[local-name()='complexType']/*[local-name()='sequence' or local-name()='choice' or local-name()='all']/*[local-name()='element']", element).length > 0;
+        const hasDirectChildren = this.selectElements("./*[local-name()='element' or local-name()='choice' or local-name()='group' or local-name()='any']", element).length > 0 ||
+            this.selectElements("./*[local-name()='complexType']/*[local-name()='sequence' or local-name()='choice' or local-name()='all']/*[local-name()='element' or local-name()='choice' or local-name()='group' or local-name()='any']", element).length > 0;
         
         const hasExtensionChildren = type ? 
             this.selectElements(`//*[local-name()='complexType'][@name='${type.split(':').pop()}']/*[local-name()='complexContent']/*[local-name()='extension']`).length > 0 : 
@@ -699,7 +807,7 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
                     }
                 }
             } catch (error) {
-                console.error('XPath search error:', error);
+                this.logError('XPath search error', error);
             }
         }
         
@@ -718,7 +826,7 @@ export class XsdOutlineProvider implements vscode.TreeDataProvider<XsdNode>, vsc
             editor.revealRange(new vscode.Range(position, position));
             return true;
         } catch (error) {
-            console.error('Error focusing element:', error);
+            this.logError('Error focusing element', error);
             return false;
         }
     }
